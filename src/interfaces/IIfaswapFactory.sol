@@ -10,6 +10,8 @@ interface IIfaswapFactory {
     error ZeroAddress();
     error PairExists();
     error Forbidden();
+    error PriceFeedDoesNotExists(address);
+    // error Forbidden();
 
     function feeTo() external view returns (address);
     function feeToSetter() external view returns (address);
