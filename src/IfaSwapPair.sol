@@ -45,12 +45,44 @@ contract IfaSwapPair is IIfaSwapPair, IfaswapERC20 {
     }
 
     // this low-level function should be called from a contract which performs important safety checks
+    function swap(uint256 amount0Out, uint256 amount1Out, address to) external lock {
+        require(amount0Out > 0 || amount1Out > 0, INSUFFICIENT_OUTPUT_AMOUNT());
+        (uint128 _reserve0, uint128 _reserve1, uint256 _reserveUsd) = getReserves(); // gas savings
+        require(amount0Out < _reserve0 && amount1Out < _reserve1, INSUFFICIENT_LIQUIDITY());
+
+        uint256 balance0;
+        uint256 balance1;
+        {
+            // scope for _token{0,1}, avoids stack too deep errors
+            address _token0 = token0;
+            address _token1 = token1;
+            require(to != _token0 && to != _token1, INVALID_TO());
+            if (amount0Out > 0) _safeTransfer(_token0, to, amount0Out); // optimistically transfer tokens
+            if (amount1Out > 0) _safeTransfer(_token1, to, amount1Out); // optimistically transfer tokens
+
+            balance0 = IERC20(_token0).balanceOf(address(this));
+            balance1 = IERC20(_token1).balanceOf(address(this));
+        }
+        uint256 amount0In = balance0 > _reserve0 - amount0Out ? balance0 - (_reserve0 - amount0Out) : 0;
+        uint256 amount1In = balance1 > _reserve1 - amount1Out ? balance1 - (_reserve1 - amount1Out) : 0;
+        require(amount0In > 0 || amount1In > 0, INSUFFICIENT_INPUT_AMOUNT());
+        {
+            // scope for reserve{0,1}Adjusted, avoids stack too deep errors
+            uint256 balance0Adjusted = (balance0 * 1000) - (amount0In * (6));
+            uint256 balance1Adjusted = balance1 * (1000) - (amount1In * (6));
+            uint256 balance0Usd = getUsdValue(token0, balance0Adjusted);
+            uint256 balance1Usd = getUsdValue(token1, balance1Adjusted);
+            require(balance0Usd + balance1Usd >= _reserveUsd, INVALID_AFTERSWAPCHEK());
+        }
+
+        emit Swap(msg.sender, amount0In, amount1In, amount0Out, amount1Out, to);
+    }
+
+    // this low-level function should be called from a contract which performs important safety checks
     function mint(address to) external lock returns (uint256 liquidity) {
         (uint128 _reserve0, uint128 _reserve1, uint256 _reserveUsd) = getReserves(); // gas savings
         uint256 balance0 = IERC20(token0).balanceOf(address(this));
         uint256 balance1 = IERC20(token1).balanceOf(address(this));
-        uint256 balance0Usd = getUsdValue(token0, balance0);
-        uint256 balance1Usd = getUsdValue(token1, balance1);
 
         uint256 amount0 = balance0 - (_reserve0);
         uint256 amount1 = balance1 - (_reserve1);
