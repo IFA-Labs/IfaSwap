@@ -1,9 +1,9 @@
 //SPDX-License-Identifier: MIT
 pragma solidity =0.8.29;
 
-import "./interfaces/IIfaswapERC20.sol";
+import "./interfaces/IIfaSwapERC20.sol";
 
-contract IfaswapERC20 is IIfaswapERC20 {
+contract IfaSwapERC20 is IIfaswapERC20 {
     string public constant name = "IFASWAP";
     string public constant symbol = "IFA-LP";
     uint8 public constant decimals = 18;
@@ -59,7 +59,7 @@ contract IfaswapERC20 is IIfaswapERC20 {
         return true;
     }
 
-    function transferFrom(address from, address to, uint256 value) external returns (bool) {
+    function transferFrom(address from, address to, uint256 value) external virtual returns (bool) {
         if (allowance[from][msg.sender] != type(uint256).max) {
             require(allowance[from][msg.sender] >= value, InvalidAllowance());
             allowance[from][msg.sender] = allowance[from][msg.sender] - value;

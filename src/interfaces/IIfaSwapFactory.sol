@@ -1,7 +1,7 @@
 //SPDX-License-Identifier: MIT
 pragma solidity >=0.8.29;
 
-interface IIfaswapFactory {
+interface IIfaSwapFactory {
     event PairCreated(
         address indexed token0, address indexed token1, address pair, uint256 pairNumber, uint256 creationTime
     );

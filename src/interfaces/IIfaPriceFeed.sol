@@ -30,17 +30,15 @@ interface IIfaPriceFeed {
     error InvalidVerifier(address _verifier);
 
     struct PriceFeed {
-        uint8 decimal;
+        int8 decimal;
         uint256 lastUpdateTime;
         uint256 price;
-        uint256 roundId;
     }
 
     struct DerviedPair {
-        uint8 decimal; // DerviedPair is always  MAX_DECIMAL(18)
+        int8 decimal; // DerviedPair is always  MAX_DECIMAL(18)
         uint256 lastUpdateTime; // the  min of  asset0.lastUpdateTime  and asset1.lastUpdateTime
         uint256 derivedPrice;
-        int256 roundDifference; //  roundDifference = asset0.roundId - asset1.roundId  if Pair direction is Forward  otherwise  roundDifference = asset1.roundId  - asset0.roundId
     }
 
     event AssetInfoSet(bytes32 indexed _assetIndex, PriceFeed indexed assetInfo);
@@ -51,7 +49,7 @@ interface IIfaPriceFeed {
     /// @param _assetIndex The index of the asset
     /// @return assetInfo The price information of the asset
 
-    function getAssetInfo(bytes32 _assetIndex) external returns (PriceFeed memory assetInfo, bool exist);
+    function getAssetInfo(bytes32 _assetIndex) external view returns (PriceFeed memory assetInfo, bool exist);
 
     /// @notice Get the price information of multiple assets
     /// @param _assetIndexes The array of asset indexes

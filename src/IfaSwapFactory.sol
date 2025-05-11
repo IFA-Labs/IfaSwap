@@ -1,22 +1,24 @@
 //SPDX-License-Identifier: MIT
 pragma solidity =0.8.29;
 
-import "./interfaces/IIfaswapFactory.sol";
+import {IIfaSwapFactory} from "./interfaces/IIfaSwapFactory.sol";
 import "./IfaSwapPair.sol";
 
-contract IfaSwapFactory is IIfaswapFactory {
+contract IfaSwapFactory is IIfaSwapFactory {
     address public feeTo;
     address public feeToSetter;
     address public priceFeedSetter;
+    address public priceFeedAddress;
 
     mapping(address tokenAddress => bytes32 assetId) public priceFeeds;
     mapping(address => mapping(address => address)) public getPair;
     address[] public allPairs;
 
-    constructor(address _feeToSetter, address _priceFeedSetter) {
+    constructor(address _feeToSetter, address _priceFeedSetter, address _priceFeedAddress) {
         require(_priceFeedSetter != address(0) && _feeToSetter != address(0), ZeroAddress());
         feeToSetter = _feeToSetter;
         priceFeedSetter = _priceFeedSetter;
+        priceFeedAddress = _priceFeedAddress;
     }
 
     function allPairsLength() external view returns (uint256) {
@@ -35,7 +37,7 @@ contract IfaSwapFactory is IIfaswapFactory {
         require(assetId1 != bytes32(0), PriceFeedDoesNotExists(tokenB));
 
         bytes32 salt = keccak256(abi.encodePacked(token0, token1));
-        IfaSwapPair pair = new IfaSwapPair{salt: salt}(token0, token1, assetId0, assetId1);
+        IfaSwapPair pair = new IfaSwapPair{salt: salt}(token0, token1, assetId0, assetId1, priceFeedAddress);
 
         getPair[token0][token1] = address(pair);
         getPair[token1][token0] = address(pair);
