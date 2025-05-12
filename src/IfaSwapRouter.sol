@@ -2,6 +2,7 @@
 pragma solidity ^0.8.0;
 
 import "./interfaces/IIfaSwapRouter.sol";
+import "./interfaces/IIfaPriceFeed.sol";
 
 import "./interfaces/IIfaSwapFactory.sol";
 
@@ -12,8 +13,11 @@ import "./interfaces/IERC20.sol";
 import "./interfaces/IWETH.sol";
 
 contract IfaSwapRouter is IIfaSwapRouter {
+    uint256 constant STALENESS_THRESHOLD = 1 hours;
     address public immutable factory;
     address public immutable WETH;
+    address public priceFeedAddress;
+    mapping(address tokenAddress => bytes32 assetId) public priceFeeds;
 
     modifier ensure(uint256 deadline) {
         require(deadline >= block.timestamp, EXPIRED());
@@ -29,7 +33,17 @@ contract IfaSwapRouter is IIfaSwapRouter {
         assert(msg.sender == WETH); // only accept ETH via fallback from the WETH contract
     }
 
+    function setPriceFeed(address _token, bytes32 _assetId) external {
+        require(msg.sender == factory, Forbidden());
+        priceFeeds[_token] = _assetId;
+    }
+
+    function setpriceFeedAddress(address _priceFeedAddress) external {
+        require(msg.sender == factory, Forbidden());
+        priceFeedAddress = _priceFeedAddress;
+    }
     // **** ADD LIQUIDITY ****
+
     function _addLiquidity(
         address tokenA,
         address tokenB,
@@ -47,12 +61,12 @@ contract IfaSwapRouter is IIfaSwapRouter {
         if (reserveA == 0 && reserveB == 0) {
             (amountA, amountB) = (amountADesired, amountBDesired);
         } else {
-            uint256 amountBOptimal = RouterHelper.quote(amountADesired, reserveA, reserveB);
+            uint256 amountBOptimal = quote(amountADesired, tokenA, tokenB);
             if (amountBOptimal <= amountBDesired) {
                 require(amountBOptimal >= amountBMin, INSUFFICIENT_B_AMOUNT());
                 (amountA, amountB) = (amountADesired, amountBOptimal);
             } else {
-                uint256 amountAOptimal = RouterHelper.quote(amountBDesired, reserveB, reserveA);
+                uint256 amountAOptimal = quote(amountBDesired, tokenB, tokenA);
                 assert(amountAOptimal <= amountADesired);
                 require(amountAOptimal >= amountAMin, INSUFFICIENT_A_AMOUNT());
                 (amountA, amountB) = (amountAOptimal, amountBDesired);
@@ -150,7 +164,7 @@ contract IfaSwapRouter is IIfaSwapRouter {
         address to,
         uint256 deadline
     ) external override ensure(deadline) returns (uint256[] memory amounts) {
-        amounts = RouterHelper.getAmountsOut(factory, amountIn, path);
+        amounts = getAmountsOut(amountIn, path);
         require(amounts[amounts.length - 1] >= amountOutMin, INSUFFICIENT_OUTPUT_AMOUNT());
         TransferHelper.safeTransferFrom(
             path[0], msg.sender, RouterHelper.pairFor(factory, path[0], path[1]), amounts[0]
@@ -165,7 +179,7 @@ contract IfaSwapRouter is IIfaSwapRouter {
         address to,
         uint256 deadline
     ) external override ensure(deadline) returns (uint256[] memory amounts) {
-        amounts = RouterHelper.getAmountsIn(factory, amountOut, path);
+        amounts = getAmountsIn(amountOut, path);
         require(amounts[0] <= amountInMax, EXCESSIVE_INPUT_AMOUNT());
         TransferHelper.safeTransferFrom(
             path[0], msg.sender, RouterHelper.pairFor(factory, path[0], path[1]), amounts[0]
@@ -181,7 +195,7 @@ contract IfaSwapRouter is IIfaSwapRouter {
         returns (uint256[] memory amounts)
     {
         require(path[0] == WETH, INVALID_PATH());
-        amounts = RouterHelper.getAmountsOut(factory, msg.value, path);
+        amounts = getAmountsOut(msg.value, path);
         require(amounts[amounts.length - 1] >= amountOutMin, INSUFFICIENT_OUTPUT_AMOUNT());
         IWETH(WETH).deposit{value: amounts[0]}();
         assert(IWETH(WETH).transfer(RouterHelper.pairFor(factory, path[0], path[1]), amounts[0]));
@@ -196,7 +210,7 @@ contract IfaSwapRouter is IIfaSwapRouter {
         uint256 deadline
     ) external override ensure(deadline) returns (uint256[] memory amounts) {
         require(path[path.length - 1] == WETH, INVALID_PATH());
-        amounts = RouterHelper.getAmountsIn(factory, amountOut, path);
+        amounts = getAmountsIn(amountOut, path);
         require(amounts[0] <= amountInMax, EXCESSIVE_INPUT_AMOUNT());
         TransferHelper.safeTransferFrom(
             path[0], msg.sender, RouterHelper.pairFor(factory, path[0], path[1]), amounts[0]
@@ -214,7 +228,7 @@ contract IfaSwapRouter is IIfaSwapRouter {
         uint256 deadline
     ) external override ensure(deadline) returns (uint256[] memory amounts) {
         require(path[path.length - 1] == WETH, INVALID_PATH());
-        amounts = RouterHelper.getAmountsOut(factory, amountIn, path);
+        amounts = getAmountsOut(amountIn, path);
         require(amounts[amounts.length - 1] >= amountOutMin, INSUFFICIENT_OUTPUT_AMOUNT());
         TransferHelper.safeTransferFrom(
             path[0], msg.sender, RouterHelper.pairFor(factory, path[0], path[1]), amounts[0]
@@ -232,7 +246,7 @@ contract IfaSwapRouter is IIfaSwapRouter {
         returns (uint256[] memory amounts)
     {
         require(path[0] == WETH, INVALID_PATH());
-        amounts = RouterHelper.getAmountsIn(factory, amountOut, path);
+        amounts = getAmountsIn(amountOut, path);
         require(amounts[0] <= msg.value, EXCESSIVE_INPUT_AMOUNT());
         IWETH(WETH).deposit{value: amounts[0]}();
         assert(IWETH(WETH).transfer(RouterHelper.pairFor(factory, path[0], path[1]), amounts[0]));
@@ -240,48 +254,79 @@ contract IfaSwapRouter is IIfaSwapRouter {
         if (msg.value > amounts[0]) TransferHelper.safeTransferETH(msg.sender, msg.value - amounts[0]); // refund dust eth, if any
     }
 
-    function quote(uint256 amountA, uint256 reserveA, uint256 reserveB)
-        public
-        pure
-        override
-        returns (uint256 amountB)
-    {
-        return RouterHelper.quote(amountA, reserveA, reserveB);
+    // given some amount of an asset and pair reserves, returns an equivalent amount of the other asset
+    function quote(uint256 amountA, address tokenA, address tokenB) public view override returns (uint256) {
+        bytes32 assetIdA = priceFeeds[tokenA];
+        bytes32 assetIdB = priceFeeds[tokenB];
+
+        (IIfaPriceFeed.DerviedPair memory pairInfo) =
+            IIfaPriceFeed(priceFeedAddress).getPairbyId(assetIdA, assetIdB, IIfaPriceFeed.PairDirection.Forward);
+
+        require(block.timestamp - pairInfo.lastUpdateTime <= STALENESS_THRESHOLD, PRICE_FEED_STALE());
+        require(pairInfo.derivedPrice > 0, ASSET_NOT_SET());
+
+        uint256 scaledTokenPrice = pairInfo.derivedPrice / (10 ** 12); // the pair is rasie to power of -30 so we are scale it down to -18
+
+        uint256 tokenADecimalDelta = IERC20(tokenA).decimals();
+        uint256 tokenBDecimalDelta = IERC20(tokenB).decimals();
+
+        int256 decimalDelta = int256(tokenBDecimalDelta) - int256(tokenADecimalDelta); // make abs
+
+        if (decimalDelta > 0) {
+            scaledTokenPrice = scaledTokenPrice * (10 ** uint256(decimalDelta));
+        } else {
+            scaledTokenPrice = scaledTokenPrice / (10 ** RouterHelper.abs(decimalDelta));
+        }
+        return amountA * scaledTokenPrice / 10 ** 18;
     }
 
-    function getAmountOut(uint256 amountIn, uint256 reserveIn, uint256 reserveOut)
+    function getAmountOut(uint256 amountIn, address tokenIn, address tokenOut)
         public
-        pure
+        view
         override
         returns (uint256 amountOut)
     {
-        return RouterHelper.getAmountOut(amountIn, reserveIn, reserveOut);
+        uint256 amount = quote(amountIn, tokenIn, tokenOut);
+        amountOut = amount * 994 / 1000;
     }
 
-    function getAmountIn(uint256 amountOut, uint256 reserveIn, uint256 reserveOut)
+    function getAmountIn(uint256 amountOut, address tokenIn, address tokenOut)
         public
-        pure
+        view
         override
         returns (uint256 amountIn)
     {
-        return RouterHelper.getAmountOut(amountOut, reserveIn, reserveOut);
+        uint256 amount = quote(amountOut, tokenIn, tokenOut);
+        amountIn = amount * 1000 / 994;
     }
 
+    // performs chained getAmountOut calculations on any number of pairs
     function getAmountsOut(uint256 amountIn, address[] memory path)
         public
         view
         override
         returns (uint256[] memory amounts)
     {
-        return RouterHelper.getAmountsOut(factory, amountIn, path);
+        require(path.length >= 2, INVALID_PATH());
+        amounts = new uint256[](path.length);
+        amounts[0] = amountIn;
+        for (uint256 i; i < path.length - 1; i++) {
+            amounts[i + 1] = getAmountOut(amounts[i], path[i], path[i + 1]);
+        }
     }
 
+    // performs chained getAmountIn calculations on any number of pairs
     function getAmountsIn(uint256 amountOut, address[] memory path)
         public
         view
         override
         returns (uint256[] memory amounts)
     {
-        return RouterHelper.getAmountsIn(factory, amountOut, path);
+        require(path.length >= 2, INVALID_PATH());
+        amounts = new uint256[](path.length);
+        amounts[amounts.length - 1] = amountOut;
+        for (uint256 i = path.length - 1; i > 0; i--) {
+            amounts[i - 1] = getAmountIn(amounts[i], path[i - 1], path[i]);
+        }
     }
 }

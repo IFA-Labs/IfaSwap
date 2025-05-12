@@ -190,7 +190,7 @@ contract IfaSwapPair is IfaSwapERC20 {
         uint256 feedDecimalDelta = uint256(18) - uint256(uint8(-assetInfo.decimal));
 
         if (feedDecimalDelta > 0) {
-            scaledTokenPrice = scaledTokenPrice * (10 ** feedDecimalDelta);
+            scaledTokenPrice = uint256(assetInfo.price) * (10 ** feedDecimalDelta);
         }
         uint256 tokenDecimalDelta = IERC20(token).decimals();
 

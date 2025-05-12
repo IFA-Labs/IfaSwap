@@ -2,6 +2,7 @@
 pragma solidity =0.8.29;
 
 import {IIfaSwapFactory} from "./interfaces/IIfaSwapFactory.sol";
+import {IIfaSwapRouter} from "./interfaces/IIfaSwapRouter.sol";
 import "./IfaSwapPair.sol";
 
 contract IfaSwapFactory is IIfaSwapFactory {
@@ -9,6 +10,7 @@ contract IfaSwapFactory is IIfaSwapFactory {
     address public feeToSetter;
     address public priceFeedSetter;
     address public priceFeedAddress;
+    address public router;
 
     mapping(address tokenAddress => bytes32 assetId) public priceFeeds;
     mapping(address => mapping(address => address)) public getPair;
@@ -47,17 +49,34 @@ contract IfaSwapFactory is IIfaSwapFactory {
     }
 
     function setFeeTo(address _feeTo) external {
+        require(_feeTo != address(0));
         require(msg.sender == feeToSetter, Forbidden());
         feeTo = _feeTo;
     }
 
     function setFeeToSetter(address _feeToSetter) external {
+        require(_feeToSetter != address(0));
         require(msg.sender == feeToSetter, Forbidden());
         feeToSetter = _feeToSetter;
     }
 
+    function setpriceFeedAddress(address _priceFeedAddress) external {
+        require(_priceFeedAddress != address(0));
+        require(msg.sender == priceFeedSetter, Forbidden());
+        priceFeedAddress = _priceFeedAddress;
+        IIfaSwapRouter(router).setpriceFeedAddress(_priceFeedAddress);
+    }
+
     function setPriceFeed(address _token, bytes32 _assetId) external {
+        require(_token != address(0) && _assetId != bytes32(0));
         require(msg.sender == priceFeedSetter, Forbidden());
         priceFeeds[_token] = _assetId;
+        IIfaSwapRouter(router).setPriceFeed(_token, _assetId);
+    }
+
+    function setRouter(address _router) external {
+        require(_router != address(0));
+        require(msg.sender == priceFeedSetter, Forbidden());
+        router = _router;
     }
 }

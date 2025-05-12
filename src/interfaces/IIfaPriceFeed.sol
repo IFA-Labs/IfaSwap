@@ -30,13 +30,13 @@ interface IIfaPriceFeed {
     error InvalidVerifier(address _verifier);
 
     struct PriceFeed {
+        int256 price;
         int8 decimal;
-        uint256 lastUpdateTime;
-        uint256 price;
+        uint64 lastUpdateTime;
     }
 
     struct DerviedPair {
-        int8 decimal; // DerviedPair is always  MAX_DECIMAL(18)
+        int8 decimal; // DerviedPair is always  MAX_DECIMAL(-30)
         uint256 lastUpdateTime; // the  min of  asset0.lastUpdateTime  and asset1.lastUpdateTime
         uint256 derivedPrice;
     }
@@ -65,6 +65,7 @@ interface IIfaPriceFeed {
     /// @return pairInfo The derived pair information.
     function getPairbyId(bytes32 _assetIndex0, bytes32 _assetIndex1, PairDirection _direction)
         external
+        view
         returns (DerviedPair memory pairInfo);
 
     /// @notice Retrieves pair information for multiple asset pairs with specified directions.
@@ -76,7 +77,7 @@ interface IIfaPriceFeed {
         bytes32[] memory _assetIndexes0,
         bytes32[] memory _assetsIndexes1,
         PairDirection[] memory _direction
-    ) external returns (DerviedPair[] memory pairsInfo);
+    ) external view returns (DerviedPair[] memory pairsInfo);
 
     /// @notice Retrieves pair information for multiple asset pairs in the forward direction.
     /// @param _assetIndexes0 Array of indexes for the first assets in pairs.
@@ -84,6 +85,7 @@ interface IIfaPriceFeed {
     /// @return pairsInfo Array of derived pair information.
     function getPairsbyIdForward(bytes32[] memory _assetIndexes0, bytes32[] memory _assetsIndexes1)
         external
+        view
         returns (DerviedPair[] memory pairsInfo);
 
     /// @notice Retrieves pair information for multiple asset pairs in the backward direction.
@@ -92,5 +94,6 @@ interface IIfaPriceFeed {
     /// @return pairsInfo Array of derived pair information.
     function getPairsbyIdBackward(bytes32[] memory _assetIndexes0, bytes32[] memory _assetsIndexes1)
         external
+        view
         returns (DerviedPair[] memory pairsInfo);
 }
