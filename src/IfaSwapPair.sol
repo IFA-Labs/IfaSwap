@@ -76,7 +76,7 @@ contract IfaSwapPair is IfaSwapERC20 {
     function swap(uint256 amount0Out, uint256 amount1Out, address to) external lock {
         require(amount0Out > 0 || amount1Out > 0, INSUFFICIENT_OUTPUT_AMOUNT());
         (uint128 _reserve0, uint128 _reserve1, uint256 _reserveUsd) = getReserves(); // gas savings
-        require(amount0Out < _reserve0 && amount1Out < _reserve1, INSUFFICIENT_LIQUIDITY());
+        require(amount0Out < _reserve0 && amount1Out < _reserve1, INSUFFICIENT_LIQUIDITY()); //@audit is this assert right ???
 
         uint256 balance0;
         uint256 balance1;
@@ -102,7 +102,7 @@ contract IfaSwapPair is IfaSwapERC20 {
             uint256 balance1Usd = getUsdValue(token1, balance1Adjusted);
             require(balance0Usd + balance1Usd >= _reserveUsd, INVALID_AFTERSWAPCHEK());
         }
-
+        _update(balance0, balance1);
         emit Swap(msg.sender, amount0In, amount1In, amount0Out, amount1Out, to);
     }
 
@@ -126,7 +126,7 @@ contract IfaSwapPair is IfaSwapERC20 {
         }
         require(liquidity > 0, INSUFFICIENT_LIQUIDITY_MINTED());
         _mint(to, liquidity);
-
+        _update(balance0, balance1);
         if (feeOn) (,, kLast) = getReserves(); // reserve0 and reserve1 are up-to-date
         emit Mint(msg.sender, amount0, amount1);
     }
@@ -155,7 +155,7 @@ contract IfaSwapPair is IfaSwapERC20 {
 
         balance0 = IERC20(_token0).balanceOf(address(this));
         balance1 = IERC20(_token1).balanceOf(address(this));
-
+        _update(balance0, balance1);
         if (feeOn) (,, kLast) = getReserves(); // reserve0 and reserve1 are up-to-date
         emit Burn(msg.sender, amount0, amount1, to);
     }
@@ -179,6 +179,14 @@ contract IfaSwapPair is IfaSwapERC20 {
         } else if (_kLast != 0) {
             kLast = 0;
         }
+    }
+
+    function _update(uint256 balance0, uint256 balance1) private {
+        require(balance0 <= type(uint128).max && balance1 <= type(uint128).max);
+        reserve0 = uint128(balance0);
+        reserve1 = uint128(balance1);
+
+        // emit Sync(reserve0, reserve1);
     }
 
     function getUsdValue(address token, uint256 amount) public view returns (uint256 scaledTokenPrice) {

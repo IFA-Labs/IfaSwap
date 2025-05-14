@@ -45,7 +45,7 @@ contract IfaSwapERC20 is IIfaswapERC20 {
         //transfer to address(0) is allowed
 
         balanceOf[from] = balanceOf[from] - value;
-        balanceOf[to] = balanceOf[to] - value;
+        balanceOf[to] = balanceOf[to] + value;
         emit Transfer(from, to, value);
     }
 

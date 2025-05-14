@@ -24,9 +24,10 @@ contract IfaSwapRouter is IIfaSwapRouter {
         _;
     }
 
-    constructor(address _factory, address _WETH) {
+    constructor(address _factory, address _WETH, address _priceFeedAddress) {
         factory = _factory;
         WETH = _WETH;
+        priceFeedAddress = _priceFeedAddress;
     }
 
     receive() external payable {
