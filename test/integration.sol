@@ -6,7 +6,7 @@ import "forge-std/console2.sol";
 import {IfaSwapFactory} from "../src/IfaSwapFactory.sol";
 
 import "../src/IfaSwapRouter.sol";
-import "./mock/MockToken.sol";
+import {MockToken} from "./mock/MockToken.sol";
 import "./mock/MockPriceFeed.sol";
 
 import {IfaSwapPair} from "../src/IfaSwapPair.sol";
@@ -156,6 +156,7 @@ contract IfaSwapIntegrationTest is Test {
         // Remove liquidity
         IfaSwapPair(pairAB).approve(address(router), type(uint256).max);
         IfaSwapPair(pairAB).allowance(address(liquidityProvider), address(router));
+        console2.log("Price::", IfaSwapPair(pairAB).getUsdValue(address(tokenA), 1e18));
 
         (uint256 removedA, uint256 removedB) = router.removeLiquidity(
             address(tokenA),

@@ -1,3 +1,14 @@
+## Deployment Info 
+
+```shell 
+== Logs ==
+  Deploying from: 0xcd6CEEf9081622E5d59C54B7569e0979494dC207
+  ifaSwapFactory deployed at: 0x045A543FFf5D816fBA83F8af069a13877C5E6a4B
+  IfaSwapRouter deployed at: 0x4C340689308af4354704EF753c264bD1946230B8
+
+```
+
+
 ## Foundry
 
 **Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**

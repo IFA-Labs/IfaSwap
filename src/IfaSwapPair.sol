@@ -1,37 +1,14 @@
 //SPDX-License-Identifier: MIT
 pragma solidity =0.8.29;
 
-import "./interfaces/IIfaSwapPair.sol";
-import "./interfaces/IIfaSwapFactory.sol";
-import {IERC20, IfaSwapERC20} from "src/IfaSwapERC20.sol";
+import {IIfaSwapPair} from "./interfaces/IIfaSwapPair.sol";
+import {IERC20} from "./interfaces/IERC20.sol";
+import {IIfaSwapFactory} from "./interfaces/IIfaSwapFactory.sol";
+import {IfaSwapERC20} from "src/IfaSwapERC20.sol";
 import {Math} from "./libraries/Math.sol";
-import "./interfaces/IIfaPriceFeed.sol";
+import {IIfaPriceFeed} from "./interfaces/IIfaPriceFeed.sol";
 
-contract IfaSwapPair is IfaSwapERC20 {
-    event Mint(address indexed sender, uint256 amount0, uint256 amount1);
-
-    event Burn(address indexed sender, uint256 amount0, uint256 amount1, address indexed to);
-    event Swap(
-        address indexed sender,
-        uint256 amount0In,
-        uint256 amount1In,
-        uint256 amount0Out,
-        uint256 amount1Out,
-        address indexed to
-    );
-
-    error INSUFFICIENT_LIQUIDITY_BURNED();
-    error INSUFFICIENT_LIQUIDITY_MINTED();
-    error TRANSFER_FAILED();
-    error INSUFFICIENT_OUTPUT_AMOUNT();
-    error INSUFFICIENT_LIQUIDITY();
-    error INVALID_TO();
-    error INSUFFICIENT_INPUT_AMOUNT();
-    error INVALID_AFTERSWAPCHEK();
-    error ASSET_NOT_SET();
-    error DOES_NOT_EXIST();
-    error PRICE_FEED_STALE();
-
+contract IfaSwapPair is IIfaSwapPair, IfaSwapERC20 {
     address public immutable factory;
     address public immutable token0;
     address public immutable token1;
@@ -54,8 +31,6 @@ contract IfaSwapPair is IfaSwapERC20 {
         _;
         unlocked = 1;
     }
-
-    error UnAuthorized();
 
     constructor(address _token0, address _token1, bytes32 _assetId0, bytes32 _assetId1, address _priceFeed) {
         factory = msg.sender;
@@ -189,6 +164,7 @@ contract IfaSwapPair is IfaSwapERC20 {
         // emit Sync(reserve0, reserve1);
     }
 
+    //@audit this is computation is not right
     function getUsdValue(address token, uint256 amount) public view returns (uint256 scaledTokenPrice) {
         bytes32 assetId = (token == token0) ? assetId0 : assetId1;
         (IIfaPriceFeed.PriceFeed memory assetInfo, bool exist) = priceFeed.getAssetInfo(assetId);
@@ -196,18 +172,26 @@ contract IfaSwapPair is IfaSwapERC20 {
         require(block.timestamp - assetInfo.lastUpdateTime <= STALENESS_THRESHOLD, PRICE_FEED_STALE());
         require(assetInfo.price > 0, ASSET_NOT_SET());
         uint256 feedDecimalDelta = uint256(18) - uint256(uint8(-assetInfo.decimal));
-
+        scaledTokenPrice = uint256(assetInfo.price);
         if (feedDecimalDelta > 0) {
             scaledTokenPrice = uint256(assetInfo.price) * (10 ** feedDecimalDelta);
         }
-        uint256 tokenDecimalDelta = IERC20(token).decimals();
+        uint256 tokenADecimalDelta = IERC20(token0).decimals();
+        uint256 tokenBDecimalDelta = IERC20(token1).decimals();
 
-        uint256 decimalDelta = uint256(18) - tokenDecimalDelta;
+        // int256 decimalDelta = (token == token0)
+        //     ? int256(tokenBDecimalDelta) - int256(tokenADecimalDelta)
+        //     : int256(tokenADecimalDelta) - int256(tokenBDecimalDelta);
+        int256 decimalDelta = (token == token0)
+            ? int256(tokenADecimalDelta) - int256(tokenBDecimalDelta)
+            : int256(tokenBDecimalDelta) - int256(tokenADecimalDelta);
 
         if (decimalDelta > 0) {
-            scaledTokenPrice = scaledTokenPrice * (10 ** decimalDelta);
+            scaledTokenPrice = scaledTokenPrice * (10 ** uint256(decimalDelta));
+        } else {
+            scaledTokenPrice = scaledTokenPrice / (10 ** Math.abs(decimalDelta));
         }
-        return scaledTokenPrice;
+        return amount * scaledTokenPrice / 10 ** 18;
     }
 
     function _safeTransfer(address token, address to, uint256 value) private {

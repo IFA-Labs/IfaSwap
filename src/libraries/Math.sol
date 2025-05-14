@@ -6,6 +6,10 @@ library Math {
         z = x < y ? x : y;
     }
 
+    function abs(int256 x) internal pure returns (uint256) {
+        return uint256(x >= 0 ? x : -x);
+    }
+
     // babylonian method (https://en.wikipedia.org/wiki/Methods_of_computing_square_roots#Babylonian_method)
     function sqrt(uint256 y) internal pure returns (uint256 z) {
         if (y > 3) {

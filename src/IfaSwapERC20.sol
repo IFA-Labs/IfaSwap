@@ -1,9 +1,9 @@
 //SPDX-License-Identifier: MIT
 pragma solidity =0.8.29;
 
-import "./interfaces/IIfaSwapERC20.sol";
+import {IIfaSwapERC20} from "./interfaces/IIfaSwapERC20.sol";
 
-contract IfaSwapERC20 is IIfaswapERC20 {
+contract IfaSwapERC20 is IIfaSwapERC20 {
     string public constant name = "IFASWAP";
     string public constant symbol = "IFA-LP";
     uint8 public constant decimals = 18;

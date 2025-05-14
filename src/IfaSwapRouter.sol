@@ -7,9 +7,9 @@ import "./interfaces/IIfaPriceFeed.sol";
 import "./interfaces/IIfaSwapFactory.sol";
 
 import "./libraries/RouterHelper.sol";
-import "./libraries/TransferHelper.sol";
+import {IERC20} from "./interfaces/IERC20.sol";
+import {TransferHelper} from "./libraries/TransferHelper.sol";
 
-import "./interfaces/IERC20.sol";
 import "./interfaces/IWETH.sol";
 
 contract IfaSwapRouter is IIfaSwapRouter {

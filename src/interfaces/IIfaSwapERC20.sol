@@ -1,7 +1,7 @@
 //SPDX-License-Identifier: MIT
 pragma solidity >=0.8.29;
 
-interface IIfaswapERC20 {
+interface IIfaSwapERC20 {
     error InvalidAllowance();
     error InvalidSignature();
     error DeadlineHasPassed();

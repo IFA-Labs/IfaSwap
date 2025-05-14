@@ -3,7 +3,7 @@ pragma solidity =0.8.29;
 
 import {IIfaSwapFactory} from "./interfaces/IIfaSwapFactory.sol";
 import {IIfaSwapRouter} from "./interfaces/IIfaSwapRouter.sol";
-import "./IfaSwapPair.sol";
+import {IfaSwapPair} from "./IfaSwapPair.sol";
 
 contract IfaSwapFactory is IIfaSwapFactory {
     address public feeTo;
